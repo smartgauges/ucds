@@ -105,7 +105,7 @@ report(){
 	echo
 }
 
-NUMS=500
+NUMS=5000
 #slcand dosn't control tx flow
 if [ -c /dev/ttyACM0 ] && [ -c /dev/ttyACM1 ]
 then
@@ -141,7 +141,6 @@ do
 	wait $candump0_pid
 	wait $candump1_pid
 
-	echo "stop"
 	can_down
 	sleep 0.5
 
