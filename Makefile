@@ -13,7 +13,7 @@ LDFLAGS=$(COMMON_FLAGS) -lc -nostartfiles -Wl,--gc-sections -Wl,--print-memory-u
 
 PHONY:all
 
-all: bl.bin gs.bin slcan.bin ch.bin ucds.bin jlrm.bin
+all: bl.bin gs.bin slcan.bin ch.bin ucds.bin jlrm.bin dfu
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -70,6 +70,11 @@ flash-bl: bl.bin
 flash-%: %.bin
 	dfu-util -s 0x08004000:leave -D $<
 
+dfu: gs.dfu slcan.dfu ch.dfu ucds.dfu jlrm.dfu
+
+%.dfu: %.bin
+	./dfu-convert -b 0x8000000:$< $@
+
 clean:
-	rm -rf *.bin *.map $(LIBOPENCM3_OBJS) *.o *.d *.elf
+	rm -rf *.bin *.dfu *.map $(LIBOPENCM3_OBJS) *.o *.d *.elf
 
