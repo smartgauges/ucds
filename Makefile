@@ -73,7 +73,7 @@ flash-%: %.bin
 dfu: gs.dfu slcan.dfu ch.dfu ucds.dfu jlrm.dfu
 
 %.dfu: %.bin
-	./dfu-convert -b 0x8000000:$< $@
+	./dfu-convert -b 0x8004000:$< $@
 
 clean:
 	rm -rf *.bin *.dfu *.map $(LIBOPENCM3_OBJS) *.o *.d *.elf
