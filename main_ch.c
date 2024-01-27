@@ -776,7 +776,7 @@ int main(void)
 	cm_disable_interrupts();
 
 	clock_setup();
-	systick_setup();
+	timer_setup();
 	led_setup();
 	systick_setup();
 

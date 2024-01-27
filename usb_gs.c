@@ -7,6 +7,7 @@
 #include "usb_private.h"
 
 #include "timer.h"
+#include "tick.h"
 #include "ring.h"
 #include "can.h"
 #include "led.h"
@@ -285,34 +286,6 @@ const struct usbd_msft_sig_descr usbMsftSigStr =
 	.reserved = 0x00
 };
 
-struct usbd_msft_comp_id
-{
-	uint32_t dwLength;
-	uint16_t wBCD;
-	uint16_t wCompabilityId;
-	uint8_t  bSectionNumber;
-	uint8_t  bReserved[7];
-	uint8_t  bIfaceNo;
-	uint8_t  bReseved1;
-	uint8_t  bCompatibleId[8];
-	uint8_t  bSubCompatibleId[8];
-	uint8_t  bReserved2[6];
-};
-
-const struct usbd_msft_comp_id usbMsftWinUsb =
-{
-	.dwLength = 0x28,
-	.wBCD = 0x0100,
-	.wCompabilityId = 0x0004,
-	.bSectionNumber = 0x01,
-	.bReserved = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	.bIfaceNo = 0x00,
-	.bReseved1 = 0x01,
-	.bCompatibleId = { 'W', 'I', 'N', 'U', 'S', 'B', 0, 0 },
-	.bSubCompatibleId = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	.bReserved2 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
-};
-
 const struct usb_device_qualifier_descriptor usbDeviceQulifier =
 {
 	.bLength = 10,
@@ -341,6 +314,7 @@ static volatile bool gs_is_configured = false;
 static uint32_t sof_timestamp_us = 0;
 
 struct gs_device_bittiming bt0, bt1;
+bool hwts0 = false, hwts1 = false;
 
 static enum usbd_request_return_codes usb_gs_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, uint8_t **buf,
 		uint16_t *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
@@ -357,6 +331,10 @@ static enum usbd_request_return_codes usb_gs_control_request(usbd_device *usbd_d
 	if ((req->bmRequestType & mask) != type)
 		return USBD_REQ_NEXT_CALLBACK;
 		//return USBD_REQ_NOTSUPP; /* Only accept class request. */
+
+	uint8_t interface = req->wIndex & 0xff;
+	if (((req->bmRequestType & USB_REQ_TYPE_RECIPIENT) == USB_REQ_TYPE_INTERFACE) && (interface != 0))
+		return USBD_REQ_NEXT_CALLBACK;
 
 	switch (req->bRequest) {
 
@@ -399,7 +377,8 @@ static enum usbd_request_return_codes usb_gs_control_request(usbd_device *usbd_d
 				}
 				else if (mode.mode == GS_CAN_MODE_START) {
 
-					//hcan->timestamps_enabled = (mode->flags & GS_CAN_MODE_HW_TIMESTAMP) != 0;
+					bool * hwts = (req->wValue == 0) ? &hwts0 : &hwts1;
+					*hwts = (mode.flags & GS_CAN_MODE_HW_TIMESTAMP) ? true : false;
 					//hcan->pad_pkts_to_max_pkt_size = (mode->flags & GS_CAN_MODE_PAD_PKTS_TO_MAX_PKT_SIZE) != 0;
 
 					struct gs_device_bittiming * bt = (req->wValue == 0) ? &bt0 : &bt1;
@@ -476,13 +455,13 @@ static void usb_gs_tx_cb(usbd_device *usbd_dev, uint8_t ep)
 	if (!ring_read(&gs_tx_ring, &gs_frame))
 		return;
 
-	len = sizeof(struct gs_host_frame) - 4;
-	if (len) {
+	len = sizeof(struct gs_host_frame);
+	bool * hwts = (gs_frame.channel == 0) ? &hwts0 : &hwts1;
+	if (!*hwts)
+		len -= 4;
 
-		led2_on();
-
-		usbd_ep_write_packet(usbd_dev, ep, &gs_frame, len);
-	}
+	led2_blink();
+	usbd_ep_write_packet(usbd_dev, ep, &gs_frame, len);
 }
 
 static void usb_gs_iface_set_config(usbd_device *usbd_dev, uint16_t wValue)
@@ -527,9 +506,6 @@ struct winusb_compatible_id_function_section {
     uint8_t  reserved1[6];
 } __attribute__((packed));
 
-#define WINUSB_COMPATIBLE_ID_FUNCTION_SECTION_SIZE 24
-
-
 /* Table 1. Header Section */
 struct winusb_compatible_id_descriptor {
     uint32_t dwLength;
@@ -540,39 +516,9 @@ struct winusb_compatible_id_descriptor {
     struct winusb_compatible_id_function_section functions[];
 } __attribute__((packed));
 
-#define WINUSB_COMPATIBLE_ID_HEADER_SIZE 16
-
-#if 0
-/*  Microsoft Compatible ID Feature Descriptor  */
-static const uint8_t USBD_MS_COMP_ID_FEATURE_DESC[] = {
-	0x40, 0x00, 0x00, 0x00, /* length */
-	0x00, 0x01,             /* version 1.0 */
-	0x04, 0x00,             /* descr index (0x0004) */
-	0x02,                   /* number of sections */
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00, 0x00,
-	0x00,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00,
-	0x01,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00
-};
-#endif
-
 static const struct winusb_compatible_id_descriptor winusb_wcid =
 {
-    .dwLength = (WINUSB_COMPATIBLE_ID_HEADER_SIZE + 1*WINUSB_COMPATIBLE_ID_FUNCTION_SECTION_SIZE),
+    .dwLength = (sizeof(struct winusb_compatible_id_descriptor) + 1*sizeof(struct winusb_compatible_id_function_section)),
     .bcdVersion = 0x0100,
     .wIndex = 0x0004,
     .bNumSections = 1,
@@ -595,17 +541,6 @@ struct winusb_extended_id_function_section {
     const char subCompatibleId[8];
     uint8_t  reserved1[6];
 } __attribute__((packed));
-
-
-struct winusb_extended_id_descriptor {
-    uint32_t dwLength;
-    uint16_t bcdVersion;
-    uint16_t wIndex;
-    uint8_t  bNumSections;
-    uint8_t  reserved[7];
-    struct winusb_extended_id_function_section functions[];
-} __attribute__((packed));
-
 
 /* Microsoft Extended Properties Feature Descriptor */
 static const uint8_t USBD_MS_EXT_PROP_FEATURE_DESC[] = {
@@ -718,7 +653,7 @@ static void usb_gs_process(usbd_device * usbd_dev)
 
 static void usb_gs_sof(void)
 {
-	sof_timestamp_us = timer_get();
+	sof_timestamp_us = systick_get_usecs();
 }
 
 static void usb_gs_reset(void)
@@ -762,7 +697,7 @@ void usb_gs_msg_push(uint8_t ch, const can_message_t * msg)
 	frame.channel = ch;
 	frame.flags = 0;
 	frame.reserved = 0;
-	frame.timestamp_us = timer_get();
+	frame.timestamp_us = systick_get_usecs();
 	for (uint8_t i = 0; i < msg->dlc; i++)
 		frame.data[i] = msg->data[i];
 

@@ -1,6 +1,7 @@
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/rcc.h>
+#include <libopencm3/cm3/cortex.h>
 
 #include "tick.h"
 #include "led.h"
@@ -30,6 +31,7 @@ void systick_setup(void)
 }
 
 volatile tick_t tick = { 0, 0, 0, 0, 0, 0 };
+volatile uint32_t usecs = 0;
 
 void sys_tick_handler(void)
 {
@@ -39,6 +41,7 @@ void sys_tick_handler(void)
 
 	tick.flag_tick = 1;
 	tick.msec++;
+	usecs += 1000;
 
 	if (++div_1000ms >= SEC_TO_TICK(1)) {
 
@@ -63,3 +66,14 @@ void sys_tick_handler(void)
 	led_tick();
 }
 
+uint32_t systick_get_usecs(void)
+{
+	cm_disable_interrupts();
+	uint32_t v = systick_get_value();
+	uint32_t value = usecs;
+	cm_enable_interrupts();
+
+	value += (1000 * v) / systick_get_reload();
+
+	return value;
+}

@@ -18,6 +18,7 @@ extern volatile tick_t tick;
 
 void systick_setup(void);
 void systick_disable(void);
+uint32_t systick_get_usecs(void);
 
 #endif
 
