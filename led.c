@@ -10,82 +10,80 @@
 #include <string.h>
 #include <errno.h>
 
-#include "led.h"
+#include "gpio.h"
 #include "tick.h"
+#include "led.h"
 
-#define LED_PORT GPIOB
-#define LED4_PIN GPIO2
-#define LED3_PIN GPIO11
-#define LED2_PIN GPIO10
+struct gpio_t led2 = GPIO_INIT(B, 10);
+struct gpio_t led3 = GPIO_INIT(B, 11);
+struct gpio_t led4 = GPIO_INIT(B, 2);
 
 static uint16_t led4_blink_div = 0;
 void led4_on(void)
 {
-	gpio_clear(LED_PORT, LED4_PIN);
+	gpio_clear(led4.port, led4.pin);
 }
 
 void led4_off(void)
 {
-	gpio_set(LED_PORT, LED4_PIN);
+	gpio_set(led4.port, led4.pin);
 	led4_blink_div = 0;
 }
 
 void led4_blink(void)
 {
-	gpio_clear(LED_PORT, LED4_PIN);
+	gpio_clear(led4.port, led4.pin);
 	led4_blink_div = 1;
 }
 
 static uint16_t led3_blink_div = 0;
 void led3_on(void)
 {
-	gpio_clear(LED_PORT, LED3_PIN);
-	led3_blink_div = 1;
+	gpio_clear(led3.port, led3.pin);
 }
 
 void led3_off(void)
 {
-	gpio_set(LED_PORT, LED3_PIN);
+	gpio_set(led3.port, led3.pin);
 	led3_blink_div = 0;
 }
 
 void led3_blink(void)
 {
-	gpio_clear(LED_PORT, LED3_PIN);
+	gpio_clear(led3.port, led3.pin);
 	led3_blink_div = 1;
 }
 
 static uint16_t led2_blink_div = 0;
 void led2_on(void)
 {
-	gpio_clear(LED_PORT, LED2_PIN);
-	led2_blink_div = 1;
+	gpio_clear(led2.port, led2.pin);
 }
 
 void led2_off(void)
 {
-	gpio_set(LED_PORT, LED2_PIN);
+	gpio_set(led2.port, led2.pin);
 	led2_blink_div = 0;
 }
 
 void led2_blink(void)
 {
-	gpio_set(LED_PORT, LED2_PIN);
-	led2_blink_div = 0;
+	gpio_clear(led2.port, led2.pin);
+	led2_blink_div = 1;
 }
 
 void led_setup(void)
 {
-	rcc_periph_clock_enable(RCC_GPIOB);
+	rcc_periph_clock_enable(led2.rcc);
 
-	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, LED4_PIN);
-	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, LED3_PIN);
-	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, LED2_PIN);
+	gpio_set_mode(led2.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, led2.pin);
+	gpio_set_mode(led3.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, led3.pin);
+	gpio_set_mode(led4.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_OPENDRAIN, led4.pin);
 
 	/* Switch off LED. */
-	led4_off();
-	led3_off();
 	led2_off();
+	led3_off();
+	led4_off();
 }
 
 static uint8_t led4_is_blink(void)
