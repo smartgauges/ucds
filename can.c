@@ -148,7 +148,7 @@ struct can_t * can_get_hscan(void)
 	return &can2;
 }
 
-static struct can_t * can_get_can3(void)
+struct can_t * can_get_mmcan(void)
 {
 	return &can3;
 }
@@ -235,7 +235,7 @@ bool can_start(struct can_t * can, e_speed_t speed)
 	return can_set_speed(can, speed);
 }
 
-static void can_enable(struct can_t * can)
+void can_enable(struct can_t * can)
 {
 	/* Enable peripheral clocks. */
 	rcc_periph_clock_enable(can->rcc);
@@ -252,6 +252,33 @@ static void can_enable(struct can_t * can)
 
 	gpio_clear(can->stb.port, can->stb.pin);
 	gpio_set_mode(can->stb.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, can->stb.pin);
+}
+
+void can_mm_switch(uint8_t enable)
+{
+	if(enable){
+		can_disable(can_get_hscan());
+
+		AFIO_MAPR |= AFIO_MAPR_CAN2_REMAP;
+
+		can_enable(can_get_mmcan());
+
+		struct can_t *can = can_get_hscan();
+		gpio_set(can->stb.port, can->stb.pin);
+		gpio_set_mode(can->stb.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, can->stb.pin);
+		led3_on();
+	}else{
+		can_disable(can_get_mmcan());
+
+		AFIO_MAPR &= ~AFIO_MAPR_CAN2_REMAP;
+
+		can_enable(can_get_hscan());
+
+		struct can_t *can = can_get_mmcan();
+		gpio_set(can->stb.port, can->stb.pin);
+		gpio_set_mode(can->stb.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, can->stb.pin);
+		led3_off();
+	}
 }
 
 void can_setup(void)
@@ -271,14 +298,9 @@ void can_setup(void)
 	//REMAP CAN1
 	AFIO_MAPR |= AFIO_MAPR_CAN1_REMAP_PORTB;
 
-	//AFIO_MAPR |= AFIO_MAPR_CAN2_REMAP;
-
 	can_enable(can_get_mscan());
-	can_enable(can_get_hscan());
 
-	struct can_t *can = can_get_can3();
-	gpio_set(can->stb.port, can->stb.pin);
-	gpio_set_mode(can->stb.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, can->stb.pin);
+	can_mm_switch(0);
 }	
 
 void can_disable(struct can_t * can)

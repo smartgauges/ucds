@@ -32,8 +32,10 @@ typedef struct can_message_t
 struct can_t;
 struct can_t * can_get_mscan(void);
 struct can_t * can_get_hscan(void);
+struct can_t * can_get_mmcan(void);
 
 void can_setup(void);
+void can_mm_switch(uint8_t enable);
 void can_disable(struct can_t * can);
 void can_stop(struct can_t * can);
 bool can_start(struct can_t * can, e_speed_t speed);
