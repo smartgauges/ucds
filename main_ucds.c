@@ -45,13 +45,7 @@ int main(void)
 			if (tick.flag_250ms) {
 
 				tick.flag_250ms = 0;
-
 				led4_blink();
-			}
-
-			if (tick.flag_1000ms) {
-
-				tick.flag_1000ms = 0;
 			}
 		}
 	}
