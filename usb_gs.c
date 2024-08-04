@@ -158,6 +158,7 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 	| GS_CAN_FEATURE_HW_TIMESTAMP
 	| GS_CAN_FEATURE_IDENTIFY
 	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE
+	| GS_CAN_FEATURE_TRIPLE_SAMPLE
 	,
 	36000000, // can timing base clock
 	1, // tseg1 min
@@ -374,6 +375,9 @@ static enum usbd_request_return_codes usb_gs_control_request(usbd_device *usbd_d
 				if (mode.mode == GS_CAN_MODE_RESET) {
 
 					can_stop(can);
+					if( req->wValue == 0 ){
+						can_mm_switch(0);
+					}
 				}
 				else if (mode.mode == GS_CAN_MODE_START) {
 
@@ -386,6 +390,11 @@ static enum usbd_request_return_codes usb_gs_control_request(usbd_device *usbd_d
 					uint32_t sjw = (bt->sjw - 1) << 24;
 					uint32_t ts2 = (bt->phase_seg2 - 1) << 20;
 					uint32_t ts1 = (bt->prop_seg + bt->phase_seg1 - 1) << 16;
+
+					// Use Triple sample flag as switch between HS-CAN and MM-CAN (Ford)
+					if( req->wValue == 0 && (mode.flags & GS_CAN_MODE_TRIPLE_SAMPLE)){
+						can_mm_switch(1);
+					}
 					can_set_bittiming(can, bt->brp, ts1, ts2, sjw);
 #if 0
 					(mode->flags & GS_CAN_MODE_LOOP_BACK) != 0,
