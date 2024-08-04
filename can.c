@@ -235,7 +235,7 @@ bool can_start(struct can_t * can, e_speed_t speed)
 	return can_set_speed(can, speed);
 }
 
-void can_enable(struct can_t * can)
+static void can_enable(struct can_t * can)
 {
 	/* Enable peripheral clocks. */
 	rcc_periph_clock_enable(can->rcc);
