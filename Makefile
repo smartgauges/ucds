@@ -13,10 +13,16 @@ LDFLAGS=$(COMMON_FLAGS) -lc -nostartfiles -Wl,--gc-sections -Wl,--print-memory-u
 
 PHONY:all
 
-all: bl.bin gs.bin slcan.bin ch.bin ucds.bin jlrm.bin dfu
+all: bl.bin gs.bin slcan.bin slcan-win10.bin ch.bin ucds.bin jlrm.bin dfu
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+main_slcan-win10.o: main_slcan.c
+	$(CC) $(CFLAGS) -c $< -o $@ -DOSWIN10
+
+usb_slcan-win10.o: usb_slcan.c
+	$(CC) $(CFLAGS) -c $< -o $@ -DOSWIN10
 
 LIBOPENCM3_OBJS = $(LIBOPENCM3_DIR)/lib/stm32/f1/gpio.o \
 		$(LIBOPENCM3_DIR)/lib/stm32/f1/rcc.o \
@@ -70,7 +76,7 @@ flash-bl: bl.bin
 flash-%: %.bin
 	dfu-util -s 0x08004000:leave -D $<
 
-dfu: gs.dfu slcan.dfu ch.dfu ucds.dfu jlrm.dfu
+dfu: gs.dfu slcan.dfu slcan-win10.dfu ch.dfu ucds.dfu jlrm.dfu
 
 %.dfu: %.bin
 	./dfu-convert -b 0x8004000:$< $@

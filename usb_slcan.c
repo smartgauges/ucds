@@ -125,7 +125,16 @@ static const struct usb_endpoint_descriptor comm_endp0 =
 {
 	.bLength = USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = 0x83/*0x84*/,
+	/*
+	 * for correct implementation of two cdc-acm on stm32f105 one endpoint is not enough
+	 * as a workaround on winxp-win8 can reuse endpoint 0x83
+	 * and on win10-win11/linux can use fake endpoint 0x84.
+	 */
+#ifdef OSWIN10
+	.bEndpointAddress = 0x84,
+#else
+	.bEndpointAddress = 0x83,
+#endif
 	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
 	.wMaxPacketSize = 16,
 	.bInterval = 255,
