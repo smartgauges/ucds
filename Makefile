@@ -1,4 +1,5 @@
 LIBOPENCM3_DIR = libopencm3
+BUILD_DIR = build
 
 PREFIX=arm-none-eabi
 CC=$(PREFIX)-gcc
@@ -6,25 +7,20 @@ OBJCOPY=$(PREFIX)-objcopy
 AR=$(PREFIX)-ar
 
 COMMON_FLAGS=-mcpu=cortex-m3 -mthumb -mfix-cortex-m3-ldrd -msoft-float -Wall -ggdb3
-CFLAGS=$(COMMON_FLAGS) -Os -std=gnu99 -I. -I$(LIBOPENCM3_DIR)/include -I$(LIBOPENCM3_DIR)/lib/ -I$(LIBOPENCM3_DIR)/lib/usb -DSTM32F1 -fno-common \
+CFLAGS=$(COMMON_FLAGS) -Os -std=gnu99 -I. \
+       -I$(LIBOPENCM3_DIR)/include -I$(LIBOPENCM3_DIR)/lib/ -I$(LIBOPENCM3_DIR)/lib/usb -DSTM32F1 -fno-common \
        -ffunction-sections -fdata-sections \
        -Wimplicit-function-declaration -Wmissing-prototypes -Wstrict-prototypes -Wundef -Wextra -Wshadow -Wredundant-decls
 LDFLAGS=$(COMMON_FLAGS) -lc -nostartfiles -Wl,--gc-sections -Wl,--print-memory-usage #-Wl,--print-gc-sections
 
-PHONY:all
+# --- Object File Definitions ---
 
-all: bl.bin gs.bin slcan.bin slcan-win10.bin ch.bin ucds.bin jlrm.bin dfu
+# Local objects shared by most targets
+LOCAL_OBJS := sbrk.o led.o clock.o tick.o ring.o timer.o adc.o can.o usb.o
+LOCAL_OBJS := $(addprefix $(BUILD_DIR)/, $(LOCAL_OBJS))
 
-%.o : %.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-main_slcan-win10.o: main_slcan.c
-	$(CC) $(CFLAGS) -c $< -o $@ -DOSWIN10
-
-usb_slcan-win10.o: usb_slcan.c
-	$(CC) $(CFLAGS) -c $< -o $@ -DOSWIN10
-
-LIBOPENCM3_OBJS = $(LIBOPENCM3_DIR)/lib/stm32/f1/gpio.o \
+# libopencm3 objects
+LIBOPENCM3_OBJS := $(LIBOPENCM3_DIR)/lib/stm32/f1/gpio.o \
 		$(LIBOPENCM3_DIR)/lib/stm32/f1/rcc.o \
 		$(LIBOPENCM3_DIR)/lib/stm32/f1/timer.o \
 		$(LIBOPENCM3_DIR)/lib/stm32/f1/flash.o \
@@ -61,13 +57,36 @@ LIBOPENCM3_OBJS = $(LIBOPENCM3_DIR)/lib/stm32/f1/gpio.o \
 		$(LIBOPENCM3_DIR)/lib/usb/usb_control.o \
 		$(LIBOPENCM3_DIR)/lib/usb/usb_standard.o
 
-%.bin: main_%.o sbrk.o led.o clock.o tick.o ring.o timer.o adc.o can.o usb.o usb_%.o $(LIBOPENCM3_OBJS)
-	$(CC) $^ -Llibopencm3/lib -Tstm32f105-app.ld $(LDFLAGS) -Wl,-Map=$<.map -o $<.elf
-	$(OBJCOPY) -O binary $<.elf $@
+LIBOPENCM3_OBJS := $(addprefix $(BUILD_DIR)/, $(LIBOPENCM3_OBJS))
 
-bl.bin: bl.o sbrk.o led.o clock.o tick.o timer.o adc.o usb.o usb_dfu.o $(LIBOPENCM3_OBJS)
-	$(CC) $^ -Llibopencm3/lib -Tstm32f105-bl.ld $(LDFLAGS) -Wl,-Map=bl.map -o bl.elf
-	$(OBJCOPY) -O binary bl.elf $@
+.PHONY: all clean dfu flash-bl
+
+all: gs.bin slcan.bin slcan-win10.bin ch.bin ucds.bin jlrm.bin bl.bin dfu
+
+# --- Compilation Rules ---
+
+# Generic rule for .o files
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Special case for win10 usb-serial hack
+$(BUILD_DIR)/%-win10.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@ -DOSWIN10
+
+# --- Binary Linking Rules ---
+
+# Rule for standard app binaries
+%.bin: $(BUILD_DIR)/main_%.o $(BUILD_DIR)/usb_%.o $(LOCAL_OBJS) $(LIBOPENCM3_OBJS)
+	$(CC) $^ -L$(LIBOPENCM3_DIR)/lib -Tstm32f105-app.ld $(LDFLAGS) -Wl,-Map=$(BUILD_DIR)/$*.map -o $(BUILD_DIR)/$*.elf
+	$(OBJCOPY) -O binary $(BUILD_DIR)/$*.elf $@
+
+# Special rule for the bootloader
+bl.bin: $(BUILD_DIR)/bl.o $(BUILD_DIR)/usb_dfu.o $(LOCAL_OBJS) $(LIBOPENCM3_OBJS)
+	$(CC) $^ -L$(LIBOPENCM3_DIR)/lib -Tstm32f105-bl.ld $(LDFLAGS) -Wl,-Map=$(BUILD_DIR)/bl.map -o $(BUILD_DIR)/bl.elf
+	$(OBJCOPY) -O binary $(BUILD_DIR)/bl.elf $@
+
+# --- Utility Targets ---
 
 flash-bl: bl.bin
 	#openocd -f stm32f1x.cfg -c "init; reset halt; targets; flash banks; stm32f1x unlock 0; reset; exit"
@@ -82,5 +101,4 @@ dfu: gs.dfu slcan.dfu slcan-win10.dfu ch.dfu ucds.dfu jlrm.dfu
 	./dfu-convert -b 0x8004000:$< $@
 
 clean:
-	rm -rf *.bin *.dfu *.map $(LIBOPENCM3_OBJS) *.o *.d *.elf
-
+	rm -rf $(BUILD_DIR) *.bin *.dfu
