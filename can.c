@@ -3,6 +3,7 @@
 #include <libopencm3/stm32/f1/nvic.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/cm3/cortex.h>
+#include <stddef.h>
 
 #include "gpio.h"
 #include "ring.h"
@@ -359,13 +360,12 @@ static void can_isr(struct can_t * can)
 		uint8_t fmi;
 		struct can_message_t msg;
 		uint32_t id = 0;
-		uint16_t timestamp = 0;
 		uint8_t dlc;
 		bool rtr = 0, ext = 0;
 
 		can->rx_cnts++;
 
-		can_receive(can->baddr, 0, false, &id, &ext, &rtr, &fmi, &dlc, msg.data, &timestamp);
+		can_receive(can->baddr, 0, false, &id, &ext, &rtr, &fmi, &dlc, msg.data, NULL);
 		can_fifo_release(can->baddr, 0);
 
 		msg.id = id;

@@ -31,7 +31,7 @@ void systick_setup(void)
 }
 
 volatile tick_t tick = { 0, 0, 0, 0, 0, 0 };
-volatile uint32_t usecs = 0;
+static volatile uint32_t usecs = 1000;
 
 void sys_tick_handler(void)
 {
@@ -73,7 +73,8 @@ uint32_t systick_get_usecs(void)
 	uint32_t value = usecs;
 	cm_enable_interrupts();
 
-	value += (1000 * v) / systick_get_reload();
+	// sysick counts DOWN!
+    value -= (1000 * v) / systick_get_reload();
 
 	return value;
 }
