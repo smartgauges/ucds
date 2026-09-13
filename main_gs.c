@@ -78,6 +78,10 @@ int main(void)
 		gs_can_read(can_get_hscan(), 0);
 		gs_can_read(can_get_mscan(), 1);
 
+		/* Push queued frames to the host now instead of waiting for the
+		 * next OTG interrupt (see usb_process_tx()). */
+		usb_process_tx();
+
 		if (tick.flag_tick) {
 
 			tick.flag_tick = 0;

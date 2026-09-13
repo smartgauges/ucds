@@ -148,6 +148,35 @@ void usb_process(void)
 	usb_cb->process(g_usbd_dev);
 }
 
+/* Kick the IN endpoint from thread(main loop) context.
+ *
+ * The OTG core only raises IEPINT/XFRC, so the transmit chain is self
+ * sustaining *only* while the driver always has another packet ready at
+ * transfer-complete time. If the tx queue happens to be empty right then, the
+ * chain stops and nothing restarts it until the next SOF/EOPF interrupt, which
+ * adds up to ~1ms of latency to the frame that arrives just afterwards.
+ *
+ * Calling this from the main loop closes that window. Only ->process() is run,
+ * not usbd_poll(), so the non-reentrant control-transfer machinery is never
+ * touched from here. The OTG interrupt is masked for the duration because the
+ * tx queue and the endpoint FIFO are otherwise owned by the interrupt.
+ */
+void usb_process_tx(void)
+{
+	if (!usb_is_enabled())
+		return;
+
+	if (!g_usbd_dev)
+		return;
+
+	if (!usb_cb->process)
+		return;
+
+	nvic_disable_irq(NVIC_OTG_FS_IRQ);
+	usb_cb->process(g_usbd_dev);
+	nvic_enable_irq(NVIC_OTG_FS_IRQ);
+}
+
 void otg_fs_isr(void)
 {
 	usb_process();
