@@ -32,6 +32,7 @@ typedef struct usb_cb_t
 void usb_setup(usb_cb_t *);
 void usb_disable(void);
 void usb_process(void);
+void usb_process_tx(void);
 
 #ifdef __cplusplus
 }   /* extern "C" */
